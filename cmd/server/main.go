@@ -354,6 +354,9 @@ func main() {
 				return
 			}
 
+			// posts table SELECT 로직 필요
+
+			// 표시할 개수 제한 필요
 			c.JSON(http.StatusOK, PostListResponse{
 				Posts: []PostView{
 					{
@@ -388,10 +391,12 @@ func main() {
 				return
 			}
 
+			// posts table INSERT 로직 필요
+			ok, err = store.createPost(request, user)
+
 			now := time.Now().Format(time.RFC3339)
 			c.JSON(http.StatusCreated, gin.H{
-				"message": "dummy create post handler",
-				"todo":    "replace with insert query",
+				"message": "post uploaded",
 				"post": PostView{
 					ID:          1,
 					Title:       strings.TrimSpace(request.Title),
@@ -416,16 +421,30 @@ func main() {
 				return
 			}
 
+			id, err := strconv.Atoi(c.Param("id"))
+			if id < 1 {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "bad request"})
+				return
+			}
+
+			// posts table SELECT ~ WHERE id = ? 로직 필요
+			post, _, err := store.readPost(id)
+			if err != nil {
+				c.JSON(http.StatusNoContent, gin.H{"message": "content not exsited"})
+				return
+			}
+			fmt.Println("post.Title:", post.Title)
+
 			c.JSON(http.StatusOK, PostResponse{
 				Post: PostView{
-					ID:          1,
-					Title:       "Dummy Post",
-					Content:     "This is a fixed dummy response. Replace this later with real board logic.",
-					OwnerID:     1,
-					Author:      "Alice Admin",
-					AuthorEmail: "alice.admin@example.com",
-					CreatedAt:   "2026-03-19T09:00:00Z",
-					UpdatedAt:   "2026-03-19T09:00:00Z",
+					post.ID,
+					post.Title,
+					post.Content,
+					post.OwnerID,
+					post.Author,
+					post.AuthorEmail,
+					post.CreatedAt,
+					post.UpdatedAt,
 				},
 			})
 		})
@@ -447,6 +466,8 @@ func main() {
 				c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid authorization token"})
 				return
 			}
+
+			// posts table UPDATE TABLE ~ SET ~ WHERE id = ? 로직 필요
 
 			now := time.Now().Format(time.RFC3339)
 			c.JSON(http.StatusOK, gin.H{
@@ -476,6 +497,8 @@ func main() {
 				return
 			}
 
+			// posts table UPDATE TABLE posts SET <삭제 여부> WHERE id = ? 로직 필요
+
 			c.JSON(http.StatusOK, gin.H{
 				"message": "dummy delete post handler",
 				"todo":    "replace with ownership check and delete query",
@@ -487,6 +510,8 @@ func main() {
 		panic(err)
 	}
 }
+
+// --- main() func end
 
 func openStore(databasePath, schemaFile, seedFile string) (*Store, error) {
 	db, err := sql.Open("sqlite", databasePath)
@@ -529,6 +554,8 @@ func (s *Store) execSQLFile(path string) error {
 	return err
 }
 
+// --- no need to modify functions above
+
 func (s *Store) findUserByUsername(username string) (User, bool, error) {
 	row := s.db.QueryRow(`
 		SELECT id, username, name, email, phone, password, salt, balance, is_admin
@@ -549,6 +576,7 @@ func (s *Store) findUserByUsername(username string) (User, bool, error) {
 	return user, true, nil
 }
 
+// added
 func saltingfPassword(password string, salt int) (string, int) {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -566,11 +594,11 @@ func saltingfPassword(password string, salt int) (string, int) {
 	byteHash := hash.Sum(nil)
 	strHash := fmt.Sprintf("%x", byteHash)
 
-	return strHash, salt
+	return strHash, s
 }
 
+// added
 func (s *Store) insertUser(user RegisterRequest) (string, bool, error) {
-	// password salting
 	saltedPw, salt := saltingfPassword(user.Username, 0)
 
 	insertQuery := `
@@ -591,6 +619,48 @@ func (s *Store) insertUser(user RegisterRequest) (string, bool, error) {
 
 	return user.Name, true, nil
 }
+
+func (s *Store) createPost(reqPost CreatePostRequest, user User) (bool, error) {
+	insertQuery := `
+		INSERT INTO posts (title, content, owner_id, author, author_email)
+		VALUES (?, ?, ?, ?, ?)
+	`
+	if _, err := s.db.Exec(insertQuery,
+		reqPost.Title,
+		reqPost.Content,
+		user.ID,
+		user.Name,
+		user.Email,
+	); err != nil {
+		fmt.Println("err:", err)
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (s *Store) readPost(postId int) (PostView, bool, error) {
+	row := s.db.QueryRow(`
+		SELECT id, title, content, owner_id, author, author_email, created_at, updated_at
+		FROM posts
+		WHERE id = ?
+	`, postId)
+
+	var post PostView
+	if err := row.Scan(&post.ID, &post.Title, &post.Content, &post.OwnerID, &post.Author, &post.AuthorEmail, &post.CreatedAt, &post.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			fmt.Println("errorsIs", sql.ErrNoRows)
+			return PostView{}, false, nil
+		}
+		fmt.Println("err : ", err)
+		return PostView{}, false, err
+	}
+	fmt.Println("readPost")
+
+	return post, true, nil
+}
+
+// --- no need to modify functions below
 
 func newSessionStore() *SessionStore {
 	return &SessionStore{
