@@ -89,41 +89,41 @@ go run ./cmd/server
 
 ### 작업한 내용의 특징에 대해서 작성해주세요
 [실제로 구현한 기능들]
-> main.go:17~18, 로깅과 로그 로테이션을 위한 라이브러리 의존성 추가
-> main.go:31, 비밀번호 해싱을 위한 Salt 필드 추가
-> main.go:74~77, 게시글 작성자 정보 저장을 위한 Author, AuthorEmail 필드 추가
-> main.go:119~121, 패키지 경로 분류 후 경로 갱신 및 const화
-> main.go:123, log 생성 위치 추가
-> main.go:132, 로깅 및 감사를 위한 initLogger() 추가
-> main.go:137, 로그 로테이션을 위한 JSONLogger() 추가
-> main.go:155, api/auth/register 회원가입 기능 구현(DB 데이터 삽입, 비밀번호 해싱)
-> main.go:191, api/auth/login 로그인 기능 보완(해싱된 비밀번호 비교 검증)
-> main.go:402, api/posts 게시글 작성 기능 구현
-> main.go:438, api/posts:id 특정 게시글 조회 기능 구현
-> main.go:568, 비밀번호 해싱 비교 검증을 위한 sql 구문 수정
-> main.go:587, 비밀번호 유출을 방지하기 위 해싱 함수 구현
-> main.go:608, 회원가입 쿼리 실행 함수 구현
-> main.go:630, 게시글 작성 쿼리 실행 함수 구현
-> main.go:649, 특정 id 게시글 조회 쿼리 실행 함수 구현
-> main.go:670, 로깅을 위한 initLogger 함수 구현
-> main.go:685, 로그 로테이션을 위한 JSONLogger 함수 구현 (충분한 로깅을 위해 MaxSize 10으로 수정)
-> 체계적인 코드관리를 위해 폴더를 아래처럼 구분
->> pkg/
->>>> cmd/server/main.go
->>>> ext/db/sqlite/
->>>>>> init/
->>>>>>>> schema.sql
->>>>>>>> seed.sql
->>>>>> sample/
->>>>>>>> query_examples.sql
->>>>>> app.db
->>>> handlers
->>>> logs/
->>>> static/
->> go.mod
->> go.sum
->> README.md
-> 
+- main.go:17~18, 로깅과 로그 로테이션을 위한 라이브러리 의존성 추가
+- main.go:31, 비밀번호 해싱을 위한 Salt 필드 추가
+- main.go:74~77, 게시글 작성자 정보 저장을 위한 Author, AuthorEmail 필드 추가
+- main.go:119~121, 패키지 경로 분류 후 경로 갱신 및 const화
+- main.go:123, log 생성 위치 추가
+- main.go:132, 로깅 및 감사를 위한 initLogger() 추가
+- main.go:137, 로그 로테이션을 위한 JSONLogger() 추가
+- main.go:155, api/auth/register 회원가입 기능 구현(DB 데이터 삽입, 비밀번호 해싱, username 중복 검사)
+- main.go:191, api/auth/login 로그인 기능 보완(해싱된 비밀번호 비교 검증)
+- main.go:402, api/posts 게시글 작성 기능 구현
+- main.go:438, api/posts:id 특정 게시글 조회 기능 구현
+- main.go:568, 비밀번호 해싱 비교 검증을 위한 sql 구문 수정
+- main.go:587, 비밀번호 유출을 방지하기 위 해싱 함수 구현
+- main.go:608, 회원가입 쿼리 실행 함수 구현
+- main.go:630, 게시글 작성 쿼리 실행 함수 구현
+- main.go:649, 특정 id 게시글 조회 쿼리 실행 함수 구현
+- main.go:670, 로깅을 위한 initLogger 함수 구현
+- main.go:685, 로그 로테이션을 위한 JSONLogger 함수 구현 (충분한 로깅을 위해 MaxSize 10으로 수정)
+- 체계적인 코드관리를 위해 폴더를 아래처럼 구분
+pkg/
+├─cmd/server/main.go
+├─ext/db/sqlite/
+│　　　　├─init/
+│　　　　│ ├─schema.sql
+│　　　　│ └─seed.sql
+│　　　　├─sample/
+│　　　　│ └─query_examples.sql
+│　　　　└─app.db
+├─handlers
+├─logs/
+├─static/
+├─go.mod
+├─go.sum
+└─README.md
+
 
 
 [구현에 있어 고려해야 할 점들]
