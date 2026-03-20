@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 	_ "modernc.org/sqlite"
 )
 
@@ -114,9 +116,11 @@ type SessionStore struct {
 	tokens map[string]User
 }
 
-const app_db string = "./app.db"
-const scheme_sql string = "./schema.sql"
-const seed_sql string = "./seed.sql"
+const app_db string = "./ext/db/sqlite/app.db"
+const scheme_sql string = "./ext/db/sqlite/init/schema.sql"
+const seed_sql string = "./ext/db/sqlite/init/seed.sql"
+
+const log_dir string = "./logs/"
 
 func main() {
 	store, err := openStore(app_db, scheme_sql, seed_sql)
@@ -125,9 +129,12 @@ func main() {
 	}
 	defer store.close()
 
+	initLogger()
+
 	sessions := newSessionStore()
 
 	router := gin.Default()
+	router.Use(JSONLogger())
 	registerStaticRoutes(router)
 
 	auth := router.Group("/api/auth")
@@ -658,6 +665,34 @@ func (s *Store) readPost(postId int) (PostView, bool, error) {
 	fmt.Println("readPost")
 
 	return post, true, nil
+}
+
+func initLogger() {
+	if _, err := os.ReadDir(log_dir); err != nil {
+		os.MkdirAll(log_dir, 0755)
+		fmt.Println("New logs directory is created.")
+	}
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetOutput(&lumberjack.Logger{
+		Filename:   log_dir + "api_access.log",
+		MaxSize:    10,
+		MaxBackups: 5,
+		MaxAge:     30,
+		Compress:   false,
+	})
+}
+
+func JSONLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		log.WithFields(log.Fields{
+			"ip":     c.ClientIP(),
+			"method": c.Request.Method,
+			"path":   c.Request.URL.Path,
+			"query":  c.Request.URL.RawQuery,
+			"header": c.Request.Header,
+		})
+		c.Next()
+	}
 }
 
 // --- no need to modify functions below
