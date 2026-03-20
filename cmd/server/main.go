@@ -1,12 +1,15 @@
 package main
 
 import (
-	"crypto/rand"
+	"crypto/sha1"
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,6 +26,7 @@ type User struct {
 	Email    string `json:"email"`
 	Phone    string `json:"phone"`
 	Password string `json:"-"`
+	Salt     int    `json:"-"`
 	Balance  int64  `json:"balance"`
 	IsAdmin  bool   `json:"is_admin"`
 }
@@ -135,12 +139,29 @@ func main() {
 				return
 			}
 
+			user, ok, err := store.findUserByUsername(request.Username)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"message": "bad request"})
+				return
+			}
+
+			if ok || user.Username == request.Username {
+				c.JSON(http.StatusConflict, gin.H{"message": "username is already used."})
+				return
+			}
+			// email 형식 검사
+
+			// insertUser 호출
+			name, ok, err := store.insertUser(request)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to insert user"})
+			}
+
 			c.JSON(http.StatusAccepted, gin.H{
-				"message": "dummy register handler",
-				"todo":    "replace with actual signup validation and insert query",
+				"message": "Register Success",
 				"user": gin.H{
 					"username": request.Username,
-					"name":     request.Name,
+					"name":     name,
 					"email":    request.Email,
 					"phone":    request.Phone,
 				},
@@ -159,7 +180,9 @@ func main() {
 				c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to load user"})
 				return
 			}
-			if !ok || user.Password != request.Password {
+
+			password, _ := saltingfPassword(request.Password, user.Salt)
+			if !ok || user.Password != password {
 				c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid credentials"})
 				return
 			}
@@ -193,7 +216,7 @@ func main() {
 			sessions.delete(token)
 			clearAuthorizationCookie(c)
 			c.JSON(http.StatusOK, gin.H{
-				"message": "dummy logout handler",
+				"message": "logout success",
 				"todo":    "replace with revoke or audit logic if needed",
 			})
 		})
@@ -508,14 +531,14 @@ func (s *Store) execSQLFile(path string) error {
 
 func (s *Store) findUserByUsername(username string) (User, bool, error) {
 	row := s.db.QueryRow(`
-		SELECT id, username, name, email, phone, password, balance, is_admin
+		SELECT id, username, name, email, phone, password, salt, balance, is_admin
 		FROM users
 		WHERE username = ?
 	`, strings.TrimSpace(username))
 
 	var user User
 	var isAdmin int64
-	if err := row.Scan(&user.ID, &user.Username, &user.Name, &user.Email, &user.Phone, &user.Password, &user.Balance, &isAdmin); err != nil {
+	if err := row.Scan(&user.ID, &user.Username, &user.Name, &user.Email, &user.Phone, &user.Password, &user.Salt, &user.Balance, &isAdmin); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, false, nil
 		}
@@ -524,6 +547,49 @@ func (s *Store) findUserByUsername(username string) (User, bool, error) {
 	user.IsAdmin = isAdmin == 1
 
 	return user, true, nil
+}
+
+func saltingfPassword(password string, salt int) (string, int) {
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	s := 0
+	if salt == 0 {
+		s = rand.Intn(999999)
+	} else {
+		s = salt
+	}
+	strSalt := strconv.Itoa(s)
+	saltedPw := password + strSalt
+
+	hash := sha1.New()
+	hash.Write([]byte(saltedPw))
+	byteHash := hash.Sum(nil)
+	strHash := fmt.Sprintf("%x", byteHash)
+
+	return strHash, salt
+}
+
+func (s *Store) insertUser(user RegisterRequest) (string, bool, error) {
+	// password salting
+	saltedPw, salt := saltingfPassword(user.Username, 0)
+
+	insertQuery := `
+		INSERT INTO users (username, name, email, phone, password, salt, balance, is_admin)
+		VALUES (?, ?, ?, ?, ?, ?, 0, 0);
+	`
+
+	if _, err := s.db.Exec(insertQuery,
+		strings.TrimSpace(user.Username),
+		strings.TrimSpace(user.Name),
+		strings.TrimSpace(user.Email),
+		strings.TrimSpace(user.Phone),
+		saltedPw,
+		salt); err != nil {
+		fmt.Println("db insert failed:", err)
+		return "", false, err
+	}
+
+	return user.Name, true, nil
 }
 
 func newSessionStore() *SessionStore {
