@@ -111,12 +111,12 @@ go run ./cmd/server
 pkg/
 ├─cmd/server/main.go
 ├─ext/db/sqlite/
-│　　　　├─init/
-│　　　　│ ├─schema.sql
-│　　　　│ └─seed.sql
-│　　　　├─sample/
-│　　　　│ └─query_examples.sql
-│　　　　└─app.db
+│▤▤▤▤▤├─init/
+│▤▤▤▤▤│.├─schema.sql
+│▤▤▤▤▤│.└─seed.sql
+│▤▤▤▤▤├─sample/
+│▤▤▤▤▤│.└─query_examples.sql
+│▤▤▤▤▤└─app.db
 ├─handlers
 ├─logs/
 ├─static/
@@ -124,10 +124,8 @@ pkg/
 ├─go.sum
 └─README.md
 
-
-
 [구현에 있어 고려해야 할 점들]
-- >> 항상 가용성을 신경쓸 것 <<
+- __항상 가용성을 신경쓸 것__
 - const 적재적소에 사용하기
 - 알맞은 곳에 getter/setter
 - 코드 잘 읽히도록 짜기
