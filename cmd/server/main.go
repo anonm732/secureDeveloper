@@ -110,8 +110,12 @@ type SessionStore struct {
 	tokens map[string]User
 }
 
+const app_db string = "./app.db"
+const scheme_sql string = "./schema.sql"
+const seed_sql string = "./seed.sql"
+
 func main() {
-	store, err := openStore("./app.db", "./schema.sql", "./seed.sql")
+	store, err := openStore(app_db, scheme_sql, seed_sql)
 	if err != nil {
 		panic(err)
 	}
