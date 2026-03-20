@@ -88,8 +88,122 @@ go run ./cmd/server
 처음 상태로 다시 시작하고 싶으면 `app.db`를 지운 뒤 다시 실행하면 됩니다.
 
 ### 작업한 내용의 특징에 대해서 작성해주세요
-ex)
-> main.go:30
-> xxx 한 것을 막기위해 xxx 를 적용해 방어
+[실제로 구현한 기능들]
+> main.go:17~18, 로깅과 로그 로테이션을 위한 라이브러리 의존성 추가
+> main.go:31, 비밀번호 해싱을 위한 Salt 필드 추가
+> main.go:74~77, 게시글 작성자 정보 저장을 위한 Author, AuthorEmail 필드 추가
+> main.go:119~121, 패키지 경로 분류 후 경로 갱신 및 const화
+> main.go:123, log 생성 위치 추가
+> main.go:132, 로깅 및 감사를 위한 initLogger() 추가
+> main.go:137, 로그 로테이션을 위한 JSONLogger() 추가
+> main.go:155, api/auth/register 회원가입 기능 구현(DB 데이터 삽입, 비밀번호 해싱)
+> main.go:191, api/auth/login 로그인 기능 보완(해싱된 비밀번호 비교 검증)
+> main.go:402, api/posts 게시글 작성 기능 구현
+> main.go:438, api/posts:id 특정 게시글 조회 기능 구현
+> main.go:568, 비밀번호 해싱 비교 검증을 위한 sql 구문 수정
+> main.go:587, 비밀번호 유출을 방지하기 위 해싱 함수 구현
+> main.go:608, 회원가입 쿼리 실행 함수 구현
+> main.go:630, 게시글 작성 쿼리 실행 함수 구현
+> main.go:649, 특정 id 게시글 조회 쿼리 실행 함수 구현
+> main.go:670, 로깅을 위한 initLogger 함수 구현
+> main.go:685, 로그 로테이션을 위한 JSONLogger 함수 구현 (충분한 로깅을 위해 MaxSize 10으로 수정)
+> 체계적인 코드관리를 위해 폴더를 아래처럼 구분
+>> pkg/
+>>>> cmd/server/main.go
+>>>> ext/db/sqlite/
+>>>>>> init/
+>>>>>>>> schema.sql
+>>>>>>>> seed.sql
+>>>>>> sample/
+>>>>>>>> query_examples.sql
+>>>>>> app.db
+>>>> handlers
+>>>> logs/
+>>>> static/
+>> go.mod
+>> go.sum
+>> README.md
+> 
 
-> xxx 한 것을 고려해 구성함
+
+[구현에 있어 고려해야 할 점들]
+- >> 항상 가용성을 신경쓸 것 <<
+- const 적재적소에 사용하기
+- 알맞은 곳에 getter/setter
+- 코드 잘 읽히도록 짜기
+- 구조체는 어떻게 설계?
+- API는 기능별로 분리(절대 하나의 범용 API를 만들지마)
+- Public 함수명은 대문자 시작, Private 함수명 소문자 시작
+- 요청에 대한 검증 (파라미터, 경곅값)
+- SQLi -> Prepared Statement 사용
+- Path Traversal 방지 (Canonical Path)
+- SSRF 발생할 건덕지 만들지 말기 (요청 받고 다른 API 호출하지 말)
+- ReDoS 방지 (안전한 Regex 사)
+- 로그인, 검색, 외부 API 호출 : 연속 요청 방지 로직 만들기
+- 이미지 변환 : 업로드된 파일의 용량을 검사해서 일정 수준 미만으로 줄이기
+- Content-Type을 application/json으로 고정 (예외 처리)
+- 필요한 정보만 노출하기(DB 쿼리 결과, 에러 페이지)
+- int 형에 대한 언더플로우 방지
+- 길이 제한 빡세게
+- 요청으로 들어오는 body 길이 limit 걸기
+- 타임아웃 몇 초 설정해야할까?
+- Client 요청 - Route - 바인딩 - 검증 - 서비스 동작 - 저장소(로깅) - 응답
+- 허용 문자집합 설정 하거나 획일화하기(인코딩 일관성)
+- 검증 로직은 검증 하나당 if 하나 (길이/상태/권한 분리)
+- 로깅할 때 요청한 사용자 ID만 포함
+- HTTP Method 제한
+- 응답 형태 고정하기
+- 미들웨어 활용하기 (인증/공통 정책, 요청 컨텍스트)
+- 반대로 서비스/저장소는 권한 결정 대신하지 않기 (비즈니스 규칙/인가, 저장소 쿼리)
+- CSRF 검증 어떻게 할까? (일단 후순위)
+- Client-Agent가 API면 거부, 모바일이면 웹으로만 접속 가능하다고 안내 후 거부
+- 로그인 성공 이후의 "인가/정보노출/자원통제"에 더 신경쓰기
+- 응답 패킷에 담을 데이터는 최소 필드만. 필터링 잘 하기
+- 거절(429) 정책 + 사용자 메시지 신경쓰기
+
+- PW는 해시화해서 저장
+- 회원가입 : SELECT 후 중복 사용자(ID, 탈퇴 여부) 검증 -> 중복 없으면 PW에 Slat쳐서 INSERT INTO하기
+- 로그인 : SELECT로 ID, PW 조회 -> ID 비교 후에 맞으면 PW 조회 (PW는 해시화 후 비교)
+- 마이페이지 : SELECT로 회원 정보 조회
+- 회원 정보 갱신 : 사용자 요청 body에서 정보 파싱해서 UPDATE table SET 하기 (PW 역시 Salt쳐서 Hash)
+- 로그인 시, 세션 만들 타임아웃 두기 (갱신 버튼 누르면 시간 초기화 작업하기) / 짧은 만료 : 안전하지만 재발급 빈도 Up, UX 비용 Up / 긴 만료 : 운영 편함, 탈취 피해 Up, 권한 변경 반영 Down
+- 세션은 어떻게 할까? (JWT는 쓰지 말기, 지금 구현할 서비스에 알맞지 않음)
+- 세션에는 최소한의 권한 정보만 두기
+- 사용자 쿠키에는 HttpOnly, Secure 걸기
+- 사용자에게는 세션 ID만 발급, 쿠키로 들고 있게 하기
+- 로그아웃 누르면 세션 즉시 만료 + 세션 재사용 금지
+
+- 회원 정보 테이블 (ID[prim key], 닉네임(가변 20자), <회원가입 일자>, PW Hash, Salt, <탈퇴 여부>)
+
+db 파일처럼 외부 컴포넌트는 ext(ernal) 이라는 디렉토리로 따로 뺴서 모아둠
+pkg
+ㄴ dtos
+ㄴ ext/
+	ㄴ db/
+		ㄴ mysql
+ㄴ handlers/
+	ㄴ static.go
+ㄴ static
+main.go
+
+[계층 구조]
+Hnadler : I/O, 파싱, 응답 형식
+Service : 비즈니스 규칙, 인가, 상태 전이
+Repository : 영속성, 쿼리, 트랜잭션
+
+- Router / Middleware
+- Handler / DTO
+- Service / AuthZ
+- Repository / DB
+
+[우선 순위]
+1. 요청-응답 기능
+2. DB 연결과 쿼리 기능 정상 동작 확인
+3. 가용성 침해 가능성 검토와 피드백 반영
+4. <추가 바람>
+
+[체크리스트]
+- 입력은 무엇을 허용할 것인가?
+- 상태는 어디에 둘 것인가? 즉시 회수는 필요한가?
+- 출력은 누구에게 어디까지 보여줄 것인가?
+- 자원은 누가 얼마나 쓰게 할 것인가?
