@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL,
     phone TEXT NOT NULL,
     password TEXT NOT NULL,
+    salt INTEGER NOT NULL,
     balance INTEGER NOT NULL DEFAULT 0,
     is_admin INTEGER NOT NULL DEFAULT 0
 );
